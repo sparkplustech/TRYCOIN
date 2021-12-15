@@ -198,12 +198,7 @@ contract Trycoin is Context, TRC20, Ownable,BlackList,Pausable {
     emit Transfer(address(0), msg.sender, totalSupply);
   }
 
-    function getOwner() external view returns (address) {
-    return owner();
-    }
-
-
-  function balanceOf(address account) external view returns (uint256) {
+  function balanceOf(address account) external  whenNotPaused view returns (uint256) {
     return _balances[account];
   }
 
@@ -214,17 +209,17 @@ contract Trycoin is Context, TRC20, Ownable,BlackList,Pausable {
   }
 
 
-  function allowance(address owner, address spender) external view returns (uint256) {
+  function allowance(address owner, address spender) external  view returns (uint256) {
     return _allowances[owner][spender];
   }
 
 
-  function approve(address spender, uint256 amount) external returns (bool) {
+  function approve(address spender, uint256 amount) external whenNotPaused returns (bool) {
     _approve(_msgSender(), spender, amount);
     return true;
   }
 
-  function transferFrom(address sender, address recipient, uint256 amount) external returns (bool) {
+  function transferFrom(address sender, address recipient, uint256 amount) external whenNotPaused returns (bool) {
     require(!isBlackListed[sender]);
     _transfer(sender, recipient, amount);
     _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "TRC20: transfer amount exceeds allowance"));

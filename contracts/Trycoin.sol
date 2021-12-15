@@ -1,127 +1,77 @@
-pragma solidity 0.5.16;
-
-interface TRC20 {
-  function totalSupply() external view returns (uint256);
-  function decimals() external view returns (uint8);
-  function symbol() external view returns (string memory);
-  function name() external view returns (string memory);
-  function getOwner() external view returns (address);
-  function balanceOf(address account) external view returns (uint256);
-  function transfer(address recipient, uint256 amount) external returns (bool);
-  function allowance(address _owner, address spender) external view returns (uint256);
-  function approve(address spender, uint256 amount) external returns (bool);
-  function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-  event Transfer(address indexed from, address indexed to, uint256 value);
-  event Approval(address indexed owner, address indexed spender, uint256 value);
-}
-
-
-contract Context {
-  constructor () internal { }
-
-  function _msgSender() internal view returns (address payable) {
-    return msg.sender;
-  }
-
-  function _msgData() internal view returns (bytes memory) {
-    this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
-    return msg.data;
-  }
-}
-
+pragma solidity ^0.4.18;
 
 library SafeMath {
-
-  function add(uint256 a, uint256 b) internal pure returns (uint256) {
-    uint256 c = a + b;
-    require(c >= a, "SafeMath: addition overflow");
-
-    return c;
-  }
-
-  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
-    return sub(a, b, "SafeMath: subtraction overflow");
-  }
-
-  function sub(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-    require(b <= a, errorMessage);
-    uint256 c = a - b;
-
-    return c;
-  }
-
   function mul(uint256 a, uint256 b) internal pure returns (uint256) {
-    // Gas optimization: this is cheaper than requiring 'a' not being zero, but the
-    // benefit is lost if 'b' is also tested.
-    // See: https://github.com/OpenZeppelin/openzeppelin-contracts/pull/522
     if (a == 0) {
       return 0;
     }
-
     uint256 c = a * b;
-    require(c / a == b, "SafeMath: multiplication overflow");
-
+    assert(c / a == b);
     return c;
   }
 
   function div(uint256 a, uint256 b) internal pure returns (uint256) {
-    return div(a, b, "SafeMath: division by zero");
-  }
-
-  function div(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-    // Solidity only automatically asserts when dividing by 0
-    require(b > 0, errorMessage);
     uint256 c = a / b;
-    // assert(a == b * c + a % b); // There is no case in which this doesn't hold
-
     return c;
   }
 
-  function mod(uint256 a, uint256 b) internal pure returns (uint256) {
-    return mod(a, b, "SafeMath: modulo by zero");
+  function sub(uint256 a, uint256 b) internal pure returns (uint256) {
+    assert(b <= a);
+    return a - b;
   }
 
-  function mod(uint256 a, uint256 b, string memory errorMessage) internal pure returns (uint256) {
-    require(b != 0, errorMessage);
-    return a % b;
+  function add(uint256 a, uint256 b) internal pure returns (uint256) {
+    uint256 c = a + b;
+    assert(c >= a);
+    return c;
   }
 }
 
-
-contract Ownable is Context {
-  address private _owner;
+contract Ownable {
+  address public owner;
 
   event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 
-  constructor () internal {
-    address msgSender = _msgSender();
-    _owner = msgSender;
-    emit OwnershipTransferred(address(0), msgSender);
-  }
-
-  function owner() public view returns (address) {
-    return _owner;
+  function Ownable() public {
+    owner = msg.sender;
   }
 
   modifier onlyOwner() {
-    require(_owner == _msgSender(), "Ownable: caller is not the owner");
+    require(msg.sender == owner);
     _;
   }
 
-  function renounceOwnership() public onlyOwner {
-    emit OwnershipTransferred(_owner, address(0));
-    _owner = address(0);
-  }
-
   function transferOwnership(address newOwner) public onlyOwner {
-    _transferOwnership(newOwner);
+    require(newOwner != address(0));
+    OwnershipTransferred(owner, newOwner);
+    owner = newOwner;
   }
 
-  function _transferOwnership(address newOwner) internal {
-    require(newOwner != address(0), "Ownable: new owner is the zero address");
-    emit OwnershipTransferred(_owner, newOwner);
-    _owner = newOwner;
-  }
+}
+
+contract BlackList is Ownable {
+
+    /////// Getter to allow the same blacklist to be used also by other contracts (including upgraded Tether) ///////
+    function getBlackListStatus(address _maker) external constant returns (bool) {
+        return isBlackListed[_maker];
+    }
+
+    mapping (address => bool) public isBlackListed;
+
+    function addBlackList (address _evilUser) public onlyOwner {
+        isBlackListed[_evilUser] = true;
+        AddedBlackList(_evilUser);
+    }
+
+    function removeBlackList (address _clearedUser) public onlyOwner {
+        isBlackListed[_clearedUser] = false;
+        RemovedBlackList(_clearedUser);
+    }
+
+    event AddedBlackList(address indexed _user);
+
+    event RemovedBlackList(address indexed _user);
+
 }
 
 contract Pausable is Ownable {
@@ -142,151 +92,324 @@ contract Pausable is Ownable {
 
   function pause() onlyOwner whenNotPaused public {
     paused = true;
-    emit Pause();
+    Pause();
   }
 
   function unpause() onlyOwner whenPaused public {
     paused = false;
-    emit Unpause();
+    Unpause();
   }
 }
 
-contract BlackList is Ownable {
-    event AddedBlackList(address indexed _user);
-    event RemovedBlackList(address indexed _user);
-    function getBlackListStatus(address _maker) external view returns (bool) {
-        return isBlackListed[_maker];
-    }
-    mapping (address => bool) public isBlackListed;
 
-    function addBlackList (address _evilUser) public onlyOwner {
-        isBlackListed[_evilUser] = true;
-        emit AddedBlackList(_evilUser);
-    }
 
-    function removeBlackList (address _clearedUser) public onlyOwner {
-        isBlackListed[_clearedUser] = false;
-        emit RemovedBlackList(_clearedUser);
-    }
-
-  
-
+contract ERC20Basic {
+  function totalSupply() public constant returns (uint);
+  function balanceOf(address who) public view returns (uint256);
+  function transfer(address to, uint256 value) public returns (bool);
+  event Transfer(address indexed from, address indexed to, uint256 value);
 }
 
-contract Trycoin is Context, TRC20, Ownable,BlackList,Pausable {
+contract BasicToken is ERC20Basic {
   using SafeMath for uint256;
 
-  mapping (address => uint256) private _balances;
-  mapping (address => mapping (address => uint256)) private _allowances;
-    
-  uint256 public totalSupply;
-  uint8 public  decimals;
-  string public symbol;
+  mapping(address => uint256) balances;
+
+  function transfer(address _to, uint256 _value) public returns (bool) {
+    require(_to != address(0));
+    require(_value <= balances[msg.sender]);
+    balances[msg.sender] = balances[msg.sender].sub(_value);
+    balances[_to] = balances[_to].add(_value);
+    Transfer(msg.sender, _to, _value);
+    return true;
+  }
+
+  function balanceOf(address _owner) public view returns (uint256 balance) {
+    return balances[_owner];
+  }
+
+}
+
+contract ERC20 is ERC20Basic {
+  function allowance(address owner, address spender) public view returns (uint256);
+  function transferFrom(address from, address to, uint256 value) public returns (bool);
+  function approve(address spender, uint256 value) public returns (bool);
+  event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+
+contract StandardToken is ERC20, BasicToken {
+
+  mapping (address => mapping (address => uint256)) internal allowed;
+
+  function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+    require(_to != address(0));
+    require(_value <= balances[_from]);
+    require(_value <= allowed[_from][msg.sender]);
+
+    balances[_from] = balances[_from].sub(_value);
+    balances[_to] = balances[_to].add(_value);
+    allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value);
+    Transfer(_from, _to, _value);
+    return true;
+  }
+
+ 
+  function approve(address _spender, uint256 _value) public returns (bool) {
+    allowed[msg.sender][_spender] = _value;
+    Approval(msg.sender, _spender, _value);
+    return true;
+  }
+
+  function allowance(address _owner, address _spender) public view returns (uint256) {
+    return allowed[_owner][_spender];
+  }
+
+  function increaseApproval(address _spender, uint _addedValue) public returns (bool) {
+    allowed[msg.sender][_spender] = allowed[msg.sender][_spender].add(_addedValue);
+    Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+    return true;
+  }
+
+  function decreaseApproval(address _spender, uint _subtractedValue) public returns (bool) {
+    uint oldValue = allowed[msg.sender][_spender];
+    if (_subtractedValue > oldValue) {
+      allowed[msg.sender][_spender] = 0;
+    } else {
+      allowed[msg.sender][_spender] = oldValue.sub(_subtractedValue);
+    }
+    Approval(msg.sender, _spender, allowed[msg.sender][_spender]);
+    return true;
+  }
+
+}
+
+contract StandardTokenWithFees is StandardToken, Ownable {
+
+  // Additional variables for use if transaction fees ever became necessary
+  uint256 public basisPointsRate = 0;
+  uint256 public maximumFee = 0;
+  uint256 constant MAX_SETTABLE_BASIS_POINTS = 20;
+  uint256 constant MAX_SETTABLE_FEE = 50;
+
   string public name;
-  event DestroyedBlackFunds(address indexed _blackListedUser, uint _balance);
+  string public symbol;
+  uint8 public decimals;
+  uint public _totalSupply;
 
-  event Issue(uint amount);
+  uint public constant MAX_UINT = 2**256 - 1;
 
-  event Redeem(uint amount);
-
-  constructor() public {
-    name = "TRY Coin";
-    symbol = "TRYC";
-    decimals = 6;
-    totalSupply = 5000000000 * 10**6;
-    _balances[msg.sender] = totalSupply;
-    emit Transfer(address(0), msg.sender, totalSupply);
+  function calcFee(uint _value) constant returns (uint) {
+    uint fee = (_value.mul(basisPointsRate)).div(10000);
+    if (fee > maximumFee) {
+        fee = maximumFee;
+    }
+    return fee;
   }
 
-  function balanceOf(address account) external  whenNotPaused view returns (uint256) {
-    return _balances[account];
+  function transfer(address _to, uint _value) public returns (bool) {
+    uint fee = calcFee(_value);
+    uint sendAmount = _value.sub(fee);
+
+    super.transfer(_to, sendAmount);
+    if (fee > 0) {
+      super.transfer(owner, fee);
+    }
   }
 
-  function transfer(address recipient, uint256 amount) external whenNotPaused returns (bool) {
-    require(!isBlackListed[msg.sender]);
-    _transfer(_msgSender(), recipient, amount);
+  function transferFrom(address _from, address _to, uint256 _value) public returns (bool) {
+    require(_to != address(0));
+    require(_value <= balances[_from]);
+    require(_value <= allowed[_from][msg.sender]);
+
+    uint fee = calcFee(_value);
+    uint sendAmount = _value.sub(fee);
+
+    balances[_from] = balances[_from].sub(_value);
+    balances[_to] = balances[_to].add(sendAmount);
+    if (allowed[_from][msg.sender] < MAX_UINT) {
+        allowed[_from][msg.sender] = allowed[_from][msg.sender].sub(_value);
+    }
+    Transfer(_from, _to, sendAmount);
+    if (fee > 0) {
+      balances[owner] = balances[owner].add(fee);
+      Transfer(_from, owner, fee);
+    }
     return true;
   }
 
+  function setParams(uint newBasisPoints, uint newMaxFee) public onlyOwner {
+      // Ensure transparency by hardcoding limit beyond which fees can never be added
+      require(newBasisPoints < MAX_SETTABLE_BASIS_POINTS);
+      require(newMaxFee < MAX_SETTABLE_FEE);
 
-  function allowance(address owner, address spender) external  view returns (uint256) {
-    return _allowances[owner][spender];
-  }
+      basisPointsRate = newBasisPoints;
+      maximumFee = newMaxFee.mul(uint(10)**decimals);
 
-
-  function approve(address spender, uint256 amount) external whenNotPaused returns (bool) {
-    _approve(_msgSender(), spender, amount);
-    return true;
-  }
-
-  function transferFrom(address sender, address recipient, uint256 amount) external whenNotPaused returns (bool) {
-    require(!isBlackListed[sender]);
-    _transfer(sender, recipient, amount);
-    _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "TRC20: transfer amount exceeds allowance"));
-    return true;
+      Params(basisPointsRate, maximumFee);
   }
 
-  function increaseAllowance(address spender, uint256 addedValue) public returns (bool) {
-    _approve(_msgSender(), spender, _allowances[_msgSender()][spender].add(addedValue));
-    return true;
-  }
+  // Called if contract ever adds fees
+  event Params(uint feeBasisPoints, uint maxFee);
 
-  function decreaseAllowance(address spender, uint256 subtractedValue) public returns (bool) {
-    _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "BEP20: decreased allowance below zero"));
-    return true;
-  }
-  /**
-   * @dev Burn `amount` tokens and decreasing the total supply.
-   */
-  function burn(uint256 amount) external returns (bool) {
-    _burn(_msgSender(), amount);
-    return true;
-  }
+}
 
-  function _transfer(address sender, address recipient, uint256 amount) internal {
-    require(sender != address(0), "TRC20: transfer from the zero address");
-    require(recipient != address(0), "TRC20: transfer to the zero address");
-    _balances[sender] = _balances[sender].sub(amount, "BEP20: transfer amount exceeds balance");
-    _balances[recipient] = _balances[recipient].add(amount);
-    emit Transfer(sender, recipient, amount);
-  }
+contract UpgradedStandardToken is StandardToken {
+    // those methods are called by the legacy contract
+    // and they must ensure msg.sender to be the contract address
+    uint public _totalSupply;
+    function transferByLegacy(address from, address to, uint value) public returns (bool);
+    function transferFromByLegacy(address sender, address from, address spender, uint value) public returns (bool);
+    function approveByLegacy(address from, address spender, uint value) public returns (bool);
+    function increaseApprovalByLegacy(address from, address spender, uint addedValue) public returns (bool);
+    function decreaseApprovalByLegacy(address from, address spender, uint subtractedValue) public returns (bool);
+}
 
-  function _burn(address account, uint256 amount) internal {
-    require(account != address(0), "TRC20: burn from the zero address");
-    _balances[account] = _balances[account].sub(amount, "BEP20: burn amount exceeds balance");
-    totalSupply = totalSupply.sub(amount);
-    emit Transfer(account, address(0), amount);
-  }
 
-  function _approve(address owner, address spender, uint256 amount) internal {
-    require(owner != address(0), "TRC20: approve from the zero address");
-    require(spender != address(0), "TRC20: approve to the zero address");
-    _allowances[owner][spender] = amount;
-    emit Approval(owner, spender, amount);
-  }
+contract TryToken is Pausable, StandardTokenWithFees, BlackList {
 
-  function _burnFrom(address account, uint256 amount) internal {
-    _burn(account, amount);
-    _approve(account, _msgSender(), _allowances[account][_msgSender()].sub(amount, "TRC20: burn amount exceeds allowance"));
-  }
-  function _mint(address account, uint256 amount) internal {
-    require(account != address(0), "BEP20: mint to the zero address");
-    totalSupply = totalSupply.add(amount);
-    _balances[account] = _balances[account].add(amount);
-    emit Transfer(address(0), account, amount);
-  }
-  
-  function mint(uint256 amount) public onlyOwner returns (bool) {
-    _mint(_msgSender(), amount);
-     return true;
-  }
+    address public upgradedAddress;
+    bool public deprecated;
 
+    //  The contract can be initialized with a number of tokens
+    //  All the tokens are deposited to the owner address
+
+    function TryToken(uint _initialSupply, string _name, string _symbol, uint8 _decimals) public {
+        _totalSupply = _initialSupply;
+        name = _name;
+        symbol = _symbol;
+        decimals = _decimals;
+        balances[owner] = _initialSupply;
+        deprecated = false;
+    }
+
+    // Forward ERC20 methods to upgraded contract if this one is deprecated
+    function transfer(address _to, uint _value) public whenNotPaused returns (bool) {
+        require(!isBlackListed[msg.sender]);
+        if (deprecated) {
+            return UpgradedStandardToken(upgradedAddress).transferByLegacy(msg.sender, _to, _value);
+        } else {
+            return super.transfer(_to, _value);
+        }
+    }
+
+    // Forward ERC20 methods to upgraded contract if this one is deprecated
+    function transferFrom(address _from, address _to, uint _value) public whenNotPaused returns (bool) {
+        require(!isBlackListed[_from]);
+        if (deprecated) {
+            return UpgradedStandardToken(upgradedAddress).transferFromByLegacy(msg.sender, _from, _to, _value);
+        } else {
+            return super.transferFrom(_from, _to, _value);
+        }
+    }
+
+    // Forward ERC20 methods to upgraded contract if this one is deprecated
+    function balanceOf(address who) public constant returns (uint) {
+        if (deprecated) {
+            return UpgradedStandardToken(upgradedAddress).balanceOf(who);
+        } else {
+            return super.balanceOf(who);
+        }
+    }
+
+    // Allow checks of balance at time of deprecation
+    function oldBalanceOf(address who) public constant returns (uint) {
+        if (deprecated) {
+            return super.balanceOf(who);
+        }
+    }
+
+    // Forward ERC20 methods to upgraded contract if this one is deprecated
+    function approve(address _spender, uint _value) public whenNotPaused returns (bool) {
+        if (deprecated) {
+            return UpgradedStandardToken(upgradedAddress).approveByLegacy(msg.sender, _spender, _value);
+        } else {
+            return super.approve(_spender, _value);
+        }
+    }
+
+    function increaseApproval(address _spender, uint _addedValue) public whenNotPaused returns (bool) {
+        if (deprecated) {
+            return UpgradedStandardToken(upgradedAddress).increaseApprovalByLegacy(msg.sender, _spender, _addedValue);
+        } else {
+            return super.increaseApproval(_spender, _addedValue);
+        }
+    }
+
+    function decreaseApproval(address _spender, uint _subtractedValue) public whenNotPaused returns (bool) {
+        if (deprecated) {
+            return UpgradedStandardToken(upgradedAddress).decreaseApprovalByLegacy(msg.sender, _spender, _subtractedValue);
+        } else {
+            return super.decreaseApproval(_spender, _subtractedValue);
+        }
+    }
+
+    // Forward ERC20 methods to upgraded contract if this one is deprecated
+    function allowance(address _owner, address _spender) public constant returns (uint remaining) {
+        if (deprecated) {
+            return StandardToken(upgradedAddress).allowance(_owner, _spender);
+        } else {
+            return super.allowance(_owner, _spender);
+        }
+    }
+
+    // deprecate current contract in favour of a new one
+    function deprecate(address _upgradedAddress) public onlyOwner {
+        require(_upgradedAddress != address(0));
+        deprecated = true;
+        upgradedAddress = _upgradedAddress;
+        Deprecate(_upgradedAddress);
+    }
+
+    // deprecate current contract if favour of a new one
+    function totalSupply() public constant returns (uint) {
+        if (deprecated) {
+            return StandardToken(upgradedAddress).totalSupply();
+        } else {
+            return _totalSupply;
+        }
+    }
+
+    // Issue a new amount of tokens
+    // these tokens are deposited into the owner address
+    //
+    // @param _amount Number of tokens to be issued
+    function issue(uint amount) public onlyOwner {
+        balances[owner] = balances[owner].add(amount);
+        _totalSupply = _totalSupply.add(amount);
+        Issue(amount);
+        Transfer(address(0), owner, amount);
+    }
+
+    // Redeem tokens.
+    // These tokens are withdrawn from the owner address
+    // if the balance must be enough to cover the redeem
+    // or the call will fail.
+    // @param _amount Number of tokens to be issued
+    function redeem(uint amount) public onlyOwner {
+        _totalSupply = _totalSupply.sub(amount);
+        balances[owner] = balances[owner].sub(amount);
+        Redeem(amount);
+        Transfer(owner, address(0), amount);
+    }
 
     function destroyBlackFunds (address _blackListedUser) public onlyOwner {
         require(isBlackListed[_blackListedUser]);
-        uint dirtyFunds = _balances[_blackListedUser];
-        _balances[_blackListedUser] = 0;
-        totalSupply = totalSupply.sub(dirtyFunds);
-        emit DestroyedBlackFunds(_blackListedUser, dirtyFunds);
+        uint dirtyFunds = balanceOf(_blackListedUser);
+        balances[_blackListedUser] = 0;
+        _totalSupply = _totalSupply.sub(dirtyFunds);
+        DestroyedBlackFunds(_blackListedUser, dirtyFunds);
     }
+
+    event DestroyedBlackFunds(address indexed _blackListedUser, uint _balance);
+
+    // Called when new token are issued
+    event Issue(uint amount);
+
+    // Called when tokens are redeemed
+    event Redeem(uint amount);
+
+    // Called when contract is deprecated
+    event Deprecate(address newAddress);
+
 }
