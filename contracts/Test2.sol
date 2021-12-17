@@ -1,33 +1,27 @@
-pragma solidity 0.5.16;
+pragma solidity ^0.6.2;
 
 interface TRC20 {
-  function totalSupply() external view returns (uint256);
-  function decimals() external view returns (uint8);
-  function symbol() external view returns (string memory);
-  function name() external view returns (string memory);
-  function getOwner() external view returns (address);
-  function balanceOf(address account) external view returns (uint256);
-  function transfer(address recipient, uint256 amount) external returns (bool);
-  function allowance(address _owner, address spender) external view returns (uint256);
-  function approve(address spender, uint256 amount) external returns (bool);
-  function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
-  event Transfer(address indexed from, address indexed to, uint256 value);
-  event Approval(address indexed owner, address indexed spender, uint256 value);
+     function balanceOf(address account) external view returns (uint256);
+    function transfer(address recipient, uint256 amount) external returns (bool);
+    function allowance(address owner, address spender) external view returns (uint256);
+    function approve(address spender, uint256 amount) external returns (bool); 
+    function transferFrom(address sender, address recipient, uint256 amount) external returns (bool);
+    event Transfer(address indexed from, address indexed to, uint256 value);
+    event Approval(address indexed owner, address indexed spender, uint256 value);
+}
+
+abstract contract Context {
+    function _msgSender() internal view virtual returns (address payable) {
+        return msg.sender;
+    }
+
+    function _msgData() internal view virtual returns (bytes memory) {
+        this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
+        return msg.data;
+    }
 }
 
 
-contract Context {
-  constructor () internal { }
-
-  function _msgSender() internal view returns (address payable) {
-    return msg.sender;
-  }
-
-  function _msgData() internal view returns (bytes memory) {
-    this; // silence state mutability warning without generating bytecode - see https://github.com/ethereum/solidity/issues/2691
-    return msg.data;
-  }
-}
 
 
 library SafeMath {
@@ -124,11 +118,50 @@ contract Ownable is Context {
   }
 }
 
-contract Pausable is Ownable {
+ 
+
+contract BlackList is Ownable {
+    event AddedBlackList(address indexed _user);
+    event RemovedBlackList(address indexed _user);
+    function getBlackListStatus(address _maker) external view returns (bool) {
+        return isBlackListed[_maker];
+    }
+    mapping (address => bool) public isBlackListed;
+
+    function addBlackList (address _evilUser) public onlyOwner {
+        isBlackListed[_evilUser] = true;
+        emit AddedBlackList(_evilUser);
+    }
+
+    function removeBlackList (address _clearedUser) public onlyOwner {
+        isBlackListed[_clearedUser] = false;
+        emit RemovedBlackList(_clearedUser);
+    }
+}
+
+contract TRYCoin is Context, TRC20, Ownable,BlackList {
+  using SafeMath for uint256;
+
+  mapping (address => uint256) private _balances;
+  mapping (address => mapping (address => uint256)) private _allowances;
+    
+  uint256 public totalSupply;
+  uint8 public  decimals;
+  string public symbol;
+  string public name;
+  bool public paused = false;
+
+  event DestroyedBlackFunds(address indexed _blackListedUser, uint _balance);
   event Pause();
   event Unpause();
-
-  bool public paused = false;
+  constructor() public {
+    name = "TRY Coin";
+    symbol = "TRYC";
+    decimals = 6;
+    totalSupply = 500000000 * 10**6;
+    _balances[msg.sender] = totalSupply;
+    emit Transfer(address(0), msg.sender, totalSupply);
+  }
 
   modifier whenNotPaused() {
     require(!paused);
@@ -149,77 +182,28 @@ contract Pausable is Ownable {
     paused = false;
     emit Unpause();
   }
-}
-
-contract BlackList is Ownable {
-    event AddedBlackList(address indexed _user);
-    event RemovedBlackList(address indexed _user);
-    function getBlackListStatus(address _maker) external view returns (bool) {
-        return isBlackListed[_maker];
-    }
-    mapping (address => bool) public isBlackListed;
-
-    function addBlackList (address _evilUser) public onlyOwner {
-        isBlackListed[_evilUser] = true;
-        emit AddedBlackList(_evilUser);
-    }
-
-    function removeBlackList (address _clearedUser) public onlyOwner {
-        isBlackListed[_clearedUser] = false;
-        emit RemovedBlackList(_clearedUser);
-    }
-
-  
-
-}
-
-contract Trycoin is Context, TRC20, Ownable,BlackList,Pausable {
-  using SafeMath for uint256;
-
-  mapping (address => uint256) private _balances;
-  mapping (address => mapping (address => uint256)) private _allowances;
-    
-  uint256 public totalSupply;
-  uint8 public  decimals;
-  string public symbol;
-  string public name;
-  event DestroyedBlackFunds(address indexed _blackListedUser, uint _balance);
-
-  event Issue(uint amount);
-
-  event Redeem(uint amount);
-
-  constructor() public {
-    name = "TRY Coin";
-    symbol = "TRYC";
-    decimals = 6;
-    totalSupply = 5000000000 * 10**6;
-    _balances[msg.sender] = totalSupply;
-    emit Transfer(address(0), msg.sender, totalSupply);
-  }
-
-  function balanceOf(address account) external  whenNotPaused view returns (uint256) {
+  function balanceOf(address account) external override  view returns (uint256) {
     return _balances[account];
   }
 
-  function transfer(address recipient, uint256 amount) external whenNotPaused returns (bool) {
+  function transfer(address recipient, uint256 amount) external override  whenNotPaused returns (bool) {
     require(!isBlackListed[msg.sender]);
     _transfer(_msgSender(), recipient, amount);
     return true;
   }
 
 
-  function allowance(address owner, address spender) external  view returns (uint256) {
+  function allowance(address owner, address spender) external override view returns (uint256) {
     return _allowances[owner][spender];
   }
 
 
-  function approve(address spender, uint256 amount) external whenNotPaused returns (bool) {
+  function approve(address spender, uint256 amount) external override whenNotPaused returns (bool) {
     _approve(_msgSender(), spender, amount);
     return true;
   }
 
-  function transferFrom(address sender, address recipient, uint256 amount) external whenNotPaused returns (bool) {
+  function transferFrom(address sender, address recipient, uint256 amount) external override whenNotPaused  returns (bool) {
     require(!isBlackListed[sender]);
     _transfer(sender, recipient, amount);
     _approve(sender, _msgSender(), _allowances[sender][_msgSender()].sub(amount, "TRC20: transfer amount exceeds allowance"));
@@ -235,10 +219,8 @@ contract Trycoin is Context, TRC20, Ownable,BlackList,Pausable {
     _approve(_msgSender(), spender, _allowances[_msgSender()][spender].sub(subtractedValue, "BEP20: decreased allowance below zero"));
     return true;
   }
-  /**
-   * @dev Burn `amount` tokens and decreasing the total supply.
-   */
-  function burn(uint256 amount) external returns (bool) {
+ 
+  function burn(uint256 amount) external whenNotPaused returns (bool) {
     _burn(_msgSender(), amount);
     return true;
   }
@@ -281,12 +263,11 @@ contract Trycoin is Context, TRC20, Ownable,BlackList,Pausable {
      return true;
   }
 
-
-    function destroyBlackFunds (address _blackListedUser) public onlyOwner {
+  function destroyBlackFunds (address _blackListedUser) public onlyOwner {
         require(isBlackListed[_blackListedUser]);
         uint dirtyFunds = _balances[_blackListedUser];
         _balances[_blackListedUser] = 0;
         totalSupply = totalSupply.sub(dirtyFunds);
         emit DestroyedBlackFunds(_blackListedUser, dirtyFunds);
-    }
+  }
 }
